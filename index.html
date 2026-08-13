@@ -1491,7 +1491,7 @@
       overallUptime: "99.98%",
 
       activeIncident: {
-        enabled: true,
+        enabled: false,
         title: "Sportix is currently unavailable",
         status: "investigating",
         message: "We are investigating connectivity issues affecting Sportix.",
@@ -1518,7 +1518,7 @@
         {
           name: "Sportix",
           group: "Web application",
-          status: "major_outage",
+          status: "operational",
           uptime: "99.95%",
           response: "342 ms",
           region: "Singapore",
@@ -1568,7 +1568,7 @@
       ],
 
       maintenance: {
-        enabled: true,
+        enabled: false,
         day: "18",
         month: "Aug",
         message: "Routine infrastructure maintenance. Brief connection resets may occur.",
@@ -1602,12 +1602,14 @@
     }
 
     function createUptimeBars(service) {
+      const totalBars = 45;
+      const latestBarIndex = totalBars - 1;
       let bars = "";
 
-      for (let index = 0; index < 45; index += 1) {
+      for (let index = 0; index < totalBars; index += 1) {
         let className = "bar";
 
-        if (index === 35 && service.status !== "operational") {
+        if (index === latestBarIndex && service.status !== "operational") {
           className += " " + getStateClass(service.status);
         }
 
