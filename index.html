@@ -1492,35 +1492,27 @@
 
       activeIncident: {
         enabled: false,
-        title: "Sportix is currently unavailable",
-        status: "investigating",
-        message: "We are investigating connectivity issues affecting Sportix.",
-        startedAt: "August 14, 2026 · 11:30 PM WIB",
+        title: "",
+        status: "",
+        message: "",
+        startedAt: "",
       },
 
       services: [
         {
           name: "Made by Rizky",
-          group: "Main website",
-          status: "operational",
-          uptime: "99.99%",
-          response: "214 ms",
-          region: "Global edge",
-        },
-        {
-          name: "Portfolio",
           group: "Portfolio website",
-          status: "operational",
-          uptime: "99.98%",
-          response: "186 ms",
+          status: "maintenance",
+          uptime: "99.99%",
+          response: "Maintenance",
           region: "Global edge",
         },
         {
           name: "Sportix",
           group: "Web application",
-          status: "operational",
+          status: "maintenance",
           uptime: "99.95%",
-          response: "342 ms",
+          response: "Maintenance",
           region: "Singapore",
         },
         {
@@ -1568,13 +1560,13 @@
       ],
 
       maintenance: {
-        enabled: false,
-        day: "18",
+        enabled: true,
+        day: "14",
         month: "Aug",
-        message: "Routine infrastructure maintenance. Brief connection resets may occur.",
-        window: "01:00–02:00 WIB",
-        impact: "Minimal",
-        services: "Web infrastructure",
+        message: "Made by Rizky Portfolio and Sportix are temporarily unavailable while maintenance is in progress.",
+        window: "Until further notice",
+        impact: "Temporarily unavailable",
+        services: "Made by Rizky & Sportix",
       },
     };
 
@@ -1688,6 +1680,10 @@
       ) {
         worstStatus = "partial_outage";
       } else if (
+        STATUS_CONFIG.services.some((service) => service.status === "maintenance")
+      ) {
+        worstStatus = "maintenance";
+      } else if (
         STATUS_CONFIG.services.some((service) => service.status === "degraded")
       ) {
         worstStatus = "degraded";
@@ -1696,6 +1692,7 @@
       const overallTitles = {
         operational: "All systems operational.",
         degraded: "Some systems are degraded.",
+        maintenance: "Scheduled maintenance in progress.",
         partial_outage: "Partial service disruption.",
         major_outage: "Major service disruption.",
       };
