@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f4f4f6">
     <meta name="description" content="Live availability and incident updates for Made by Rizky services.">
     <title>
-      System Status — Made by Rizky
+      System Status â€” Made by Rizky
     </title>
     <style>
       :root {
@@ -981,9 +981,10 @@
         font-weight: 650;
         text-align: center;
         text-decoration: none;
+        transition: color 0.25s ease, border-color 0.25s ease;
       }
       
-      .mobile-nav a:first-child {
+      .mobile-nav a.is-active {
         color: var(--blue);
         border-top-color: var(--blue);
       }
@@ -1109,14 +1110,15 @@
           font-size: 0.73rem;
           font-weight: 650;
           text-decoration: none;
+          transition: color 0.25s ease;
         }
       
         .desktop-nav a:hover,
-        .desktop-nav a:first-child {
+        .desktop-nav a.is-active {
           color: var(--text);
         }
       
-        .desktop-nav a:first-child::after {
+        .desktop-nav a::after {
           position: absolute;
           right: 0;
           bottom: -16px;
@@ -1124,6 +1126,13 @@
           height: 2px;
           content: "";
           background: var(--blue);
+          transform: scaleX(0);
+          transform-origin: center;
+          transition: transform 0.25s ease;
+        }
+
+        .desktop-nav a.is-active::after {
+          transform: scaleX(1);
         }
       
         main {
@@ -1450,7 +1459,7 @@
             </button>
             <button class="control" id="refresh" type="button">
               <span class="refresh-icon">
-                ↻
+                â†»
               </span>
               <span class="refresh-label">
                 Refresh status
@@ -1696,7 +1705,7 @@
         </div>
         <div class="footer-bottom">
           <span>
-            © 2026 Made by Rizky
+            Â© 2026 Made by Rizky
           </span>
           <span>
             Status data is maintained manually from this file.
@@ -1781,17 +1790,17 @@
         {
           date: "Aug 14",
           title: "Datacenter network loop detected",
-          result: "Resolved · 11 min",
+          result: "Resolved Â· 11 min",
         },
         {
           date: "Aug 04",
           title: "SSL handshake errors",
-          result: "Resolved · 8 min",
+          result: "Resolved Â· 8 min",
         },
         {
           date: "Jul 22",
           title: "Elevated response times",
-          result: "Resolved · 17 min",
+          result: "Resolved Â· 17 min",
         },
       ],
 
@@ -1956,7 +1965,7 @@
           class="dot"
           style="background: var(--orange); box-shadow: 0 0 0 6px var(--orange-soft)"
         ></span>
-        <span>Active incident · ${incident.status}</span>
+        <span>Active incident Â· ${incident.status}</span>
       `;
 
       currentState.style.color = "var(--orange)";
@@ -2003,6 +2012,62 @@
       document.querySelector("#clock").textContent = currentTime + " WIB";
     }
 
+    const navigationLinks = Array.from(
+      document.querySelectorAll(
+        '.desktop-nav a[href^="#"], .mobile-nav a[href^="#"]',
+      ),
+    );
+
+    const navigationSections = ["overview", "services-section", "incidents"]
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+
+    function setActiveNavigation(sectionId) {
+      navigationLinks.forEach((link) => {
+        const isActive = link.getAttribute("href") === "#" + sectionId;
+
+        link.classList.toggle("is-active", isActive);
+
+        if (isActive) {
+          link.setAttribute("aria-current", "page");
+        } else {
+          link.removeAttribute("aria-current");
+        }
+      });
+    }
+
+    function updateActiveNavigation() {
+      const activationPoint = window.scrollY + window.innerHeight * 0.34;
+      let activeSection = navigationSections[0];
+
+      navigationSections.forEach((section) => {
+        if (section.offsetTop <= activationPoint) {
+          activeSection = section;
+        }
+      });
+
+      if (activeSection) {
+        setActiveNavigation(activeSection.id);
+      }
+    }
+
+    let navigationFrame = null;
+
+    function requestNavigationUpdate() {
+      if (navigationFrame !== null) return;
+
+      navigationFrame = requestAnimationFrame(() => {
+        updateActiveNavigation();
+        navigationFrame = null;
+      });
+    }
+
+    navigationLinks.forEach((link) => {
+      link.addEventListener("click", () => {
+        setActiveNavigation(link.getAttribute("href").slice(1));
+      });
+    });
+
     document.querySelector("#theme").addEventListener("click", function () {
       const button = this;
       button.classList.add("theme-animating");
@@ -2045,6 +2110,9 @@
 
     window.addEventListener("pageshow", resetHorizontalPosition);
     window.addEventListener("resize", resetHorizontalPosition);
+    window.addEventListener("scroll", requestNavigationUpdate, { passive: true });
+    window.addEventListener("resize", requestNavigationUpdate);
+    window.addEventListener("hashchange", requestNavigationUpdate);
 
     renderServices();
     renderActiveIncident();
@@ -2052,6 +2120,7 @@
     renderMaintenance();
     updateClock();
     resetHorizontalPosition();
+    updateActiveNavigation();
 
     setInterval(updateClock, 30000);
   </script>
