@@ -1638,7 +1638,7 @@
                 </span>
               </div>
               <p id="current-copy">
-                All monitored services are responding normally. A network loop at the datacenter was isolated and resolved without further impact.
+                All monitored services are responding normally. Connectivity was restored after an upstream fiber optic link failure at the datacenter.
               </p>
               <div class="history" id="history">
               </div>
@@ -1755,9 +1755,9 @@
         {
           name: "Sportix",
           group: "Web application",
-          status: "maintenance",
+          status: "operational",
           uptime: "99.95%",
-          response: "Maintenance",
+          response: "342 ms",
           region: "Singapore",
         },
         {
@@ -1788,6 +1788,11 @@
 
       incidents: [
         {
+          date: "Aug 21",
+          title: "Upstream fiber connectivity failure",
+          result: "Resolved · Connectivity restored",
+        },
+        {
           date: "Aug 14",
           title: "Datacenter network loop detected",
           result: "Resolved · 11 min",
@@ -1805,13 +1810,13 @@
       ],
 
       maintenance: {
-        enabled: true,
-        day: "16",
-        month: "Aug",
-        message: "Sportix is temporarily unavailable while scheduled infrastructure checks and stability improvements are in progress.",
-        window: "Until further notice",
-        impact: "Temporarily unavailable",
-        services: "Sportix",
+        enabled: false,
+        day: "",
+        month: "",
+        message: "",
+        window: "",
+        impact: "",
+        services: "",
       },
     };
 
