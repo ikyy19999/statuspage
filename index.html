@@ -1525,7 +1525,7 @@
                 </span>
               </div>
               <h2 class="status-title" id="overall-title">
-                Major service disruption.
+                All systems operational.
               </h2>
               <div class="summary">
                 <div class="summary-row">
@@ -1634,11 +1634,11 @@
                 <span class="dot">
                 </span>
                 <span>
-                  Active incident · investigating
+                  No active incidents
                 </span>
               </div>
               <p id="current-copy">
-                We are investigating an upstream fiber optic connectivity failure at the datacenter affecting madebyrizky.id. Sportix and other monitored services remain operational.
+                All monitored services are responding normally. Connectivity was restored after an upstream fiber optic link failure at the datacenter.
               </p>
               <div class="history" id="history">
               </div>
@@ -1736,20 +1736,20 @@
       overallUptime: "99.98%",
 
       activeIncident: {
-        enabled: true,
-        title: "Portfolio is currently unavailable",
-        status: "investigating",
-        message: "We are investigating an upstream fiber optic connectivity failure at the datacenter affecting madebyrizky.id. Sportix and other monitored services remain operational.",
-        startedAt: "August 21, 2026 · Ongoing",
+        enabled: false,
+        title: "",
+        status: "",
+        message: "",
+        startedAt: "",
       },
 
       services: [
         {
           name: "Portfolio",
           group: "Portfolio website",
-          status: "major_outage",
+          status: "operational",
           uptime: "99.99%",
-          response: "Unavailable",
+          response: "186 ms",
           region: "Global edge",
         },
         {
@@ -1790,7 +1790,7 @@
         {
           date: "Aug 21",
           title: "Upstream fiber connectivity failure",
-          result: "Investigating · Ongoing",
+          result: "Resolved · Connectivity restored",
         },
         {
           date: "Aug 14",
