@@ -1708,7 +1708,7 @@
             © 2026 Made by Rizky
           </span>
           <span>
-            Status data is maintained manually from this file.
+            Live status is synced from HetrixTools.
           </span>
         </div>
       </div>
@@ -1827,6 +1827,123 @@
       major_outage: "Major outage",
       maintenance: "Maintenance",
     };
+
+    const LIVE_STATUS_API = "/api/status";
+
+    function normalizeMonitorText(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/https?:\/\//g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
+    function monitorMatchesService(service, monitor) {
+      const serviceName = normalizeMonitorText(service.name);
+      const monitorName = normalizeMonitorText(monitor.monitor_name);
+      const target = normalizeMonitorText(monitor.monitor_target);
+
+      if (!serviceName || !monitorName) return false;
+      if (serviceName === monitorName) return true;
+      if (monitorName.includes(serviceName) || serviceName.includes(monitorName)) return true;
+
+      const serviceSlug = serviceName.replace(/\s+/g, "");
+      const monitorSlug = monitorName.replace(/\s+/g, "");
+      if (serviceSlug && monitorSlug.includes(serviceSlug)) return true;
+
+      return target.includes(serviceSlug);
+    }
+
+    function applyLiveStatus(data) {
+      if (!data || !Array.isArray(data.monitors)) return false;
+
+      let matched = 0;
+
+      STATUS_CONFIG.services.forEach((service) => {
+        const monitor = data.monitors.find((item) =>
+          monitorMatchesService(service, item),
+        );
+
+        if (!monitor) return;
+
+        service.status = monitor.status;
+        if (monitor.monitor_status === "offline") {
+          service.response = "Unavailable";
+        }
+        matched += 1;
+      });
+
+      STATUS_CONFIG.activeIncident = {
+        enabled: Array.isArray(data.active_incidents) && data.active_incidents.length > 0,
+        title: data.active_incidents?.length
+          ? `${data.active_incidents.length} monitored service${data.active_incidents.length > 1 ? "s" : ""} offline`
+          : "",
+        status: data.active_incidents?.length ? "Investigating" : "",
+        message: data.active_incidents?.length
+          ? data.active_incidents
+              .map((incident) => `${incident.monitor_name} is currently unavailable.`)
+              .join(" ")
+          : "",
+        startedAt: data.active_incidents?.length
+          ? new Date(
+              Math.min(
+                ...data.active_incidents.map((incident) =>
+                  Number(incident.started_at) * 1000,
+                ),
+              ),
+            ).toLocaleString("en-GB", {
+              timeZone: "Asia/Jakarta",
+              dateStyle: "medium",
+              timeStyle: "short",
+            }) + " WIB"
+          : "",
+      };
+
+      document.querySelector("#checked").textContent = data.checked_at
+        ? new Date(data.checked_at).toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Jakarta",
+            hour: "2-digit",
+            minute: "2-digit",
+          }) + " WIB"
+        : "Just now";
+
+      renderServices();
+      renderActiveIncident();
+
+      return matched > 0;
+    }
+
+    async function loadLiveStatus(showToast = false) {
+      try {
+        const response = await fetch(`${LIVE_STATUS_API}?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) throw new Error(`status api returned ${response.status}`);
+
+        const data = await response.json();
+        applyLiveStatus(data);
+
+        if (showToast) {
+          toastElement.classList.add("show");
+          setTimeout(() => toastElement.classList.remove("show"), 1800);
+        }
+
+        return true;
+      } catch (error) {
+        console.warn("Live status unavailable:", error);
+        if (showToast) {
+          toastElement.textContent = "Live status unavailable.";
+          toastElement.classList.add("show");
+          setTimeout(() => {
+            toastElement.classList.remove("show");
+            toastElement.textContent = "Status refreshed.";
+          }, 2200);
+        }
+        return false;
+      }
+    }
 
     const root = document.documentElement;
     const servicesElement = document.querySelector("#services");
@@ -1953,11 +2070,20 @@
 
     function renderActiveIncident() {
       const incident = STATUS_CONFIG.activeIncident;
-
-      if (!incident.enabled) return;
-
       const banner = document.querySelector("#active-incident");
       const currentState = document.querySelector("#current-state");
+
+      if (!incident.enabled) {
+        banner.classList.remove("show");
+        currentState.innerHTML = `
+          <span class="dot"></span>
+          <span>No active incidents</span>
+        `;
+        currentState.style.color = "";
+        document.querySelector("#current-copy").textContent =
+          "All monitored services are responding normally.";
+        return;
+      }
 
       banner.classList.add("show");
       document.querySelector("#incident-title").textContent = incident.title;
@@ -2087,7 +2213,7 @@
       }, 520);
     });
 
-    document.querySelector("#refresh").addEventListener("click", function () {
+    document.querySelector("#refresh").addEventListener("click", async function () {
       const button = this;
 
       if (button.classList.contains("is-refreshing")) return;
@@ -2095,16 +2221,10 @@
       button.classList.add("is-refreshing");
       button.disabled = true;
 
-      setTimeout(function () {
-        document.querySelector("#checked").textContent = "Just now";
-        button.classList.remove("is-refreshing");
-        button.disabled = false;
-        toastElement.classList.add("show");
+      await loadLiveStatus(true);
 
-        setTimeout(function () {
-          toastElement.classList.remove("show");
-        }, 1800);
-      }, 700);
+      button.classList.remove("is-refreshing");
+      button.disabled = false;
     });
 
     function resetHorizontalPosition() {
@@ -2126,8 +2246,10 @@
     updateClock();
     resetHorizontalPosition();
     updateActiveNavigation();
+    loadLiveStatus();
 
     setInterval(updateClock, 30000);
+    setInterval(loadLiveStatus, 60000);
   </script>
   </body>
 </html>
