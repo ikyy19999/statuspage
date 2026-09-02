@@ -1756,9 +1756,9 @@
           name: "Sportix",
           group: "Web application",
           status: "operational",
-          uptime: "99.95%",
-          response: "342 ms",
-          region: "Singapore",
+          uptime: "97.8246%",
+          response: "Unavailable",
+          region: "Unavailable",
         },
         {
           name: "Application API",
@@ -1867,6 +1867,12 @@
         if (!monitor) return;
 
         service.status = monitor.status;
+        if (monitor.stats) {
+          service.uptime = monitor.stats.uptime_90d || service.uptime;
+          service.response = monitor.stats.response_time || service.response;
+          service.region = monitor.stats.monitoring_region || service.region;
+        }
+
         if (monitor.monitor_status === "offline") {
           service.response = "Unavailable";
         }
@@ -1881,7 +1887,7 @@
         status: data.active_incidents?.length ? "Investigating" : "",
         message: data.active_incidents?.length
           ? data.active_incidents
-              .map((incident) => `${incident.monitor_name} is currently unavailable.`)
+              .map((incident) => `${incident.display_name || incident.monitor_name} is currently unavailable.`)
               .join(" ")
           : "",
         startedAt: data.active_incidents?.length
