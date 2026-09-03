@@ -1,6 +1,11 @@
-const MONITOR_ID = "aa30f6893c27e5421ac3ef4471fca386";
+const MONITOR_CONFIG = {
+  aa30f6893c27e5421ac3ef4471fca386: {},
+  197f125b46a6449c2d034beb044a6e34: {
+    regions: ["New_York", "Singapore", "Tokyo", "Mumbai"],
+  },
+};
+
 const CACHE_TTL_SECONDS = 300;
-const CACHE_KEY = `hetrix:stats:v2:${MONITOR_ID}`;
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -30,15 +35,14 @@ async function redis(command) {
 }
 
 // HetrixTools v1 Uptime Report API.
-// This endpoint returns the same uptime/report data represented by the
-// monitor's HetrixTools report, including uptime statistics and response
-// times by monitoring location.
-async function hetrixReport() {
+// The report contains the uptime shown by HetrixTools plus response times
+// for the monitor's configured monitoring locations.
+async function hetrixReport(monitorId) {
   const token = process.env.HETRIX_API_KEY;
   if (!token) throw new Error("HETRIX_API_KEY is not configured");
 
   const response = await fetch(
-    `https://api.hetrixtools.com/v1/${encodeURIComponent(token)}/uptime/report/${MONITOR_ID}/`,
+    `https://api.hetrixtools.com/v1/${encodeURIComponent(token)}/uptime/report/${encodeURIComponent(monitorId)}/`,
     {
       headers: { Accept: "application/json" },
     },
@@ -100,7 +104,7 @@ const REGION_LABELS = {
   Warsaw: "Warsaw",
 };
 
-function extractResponseTimes(report) {
+function extractResponseTimes(report, allowedRegions) {
   const source =
     report?.Response_Time ||
     report?.ResponseTime ||
@@ -109,6 +113,7 @@ function extractResponseTimes(report) {
     {};
 
   return Object.entries(source)
+    .filter(([key]) => !allowedRegions || allowedRegions.includes(key))
     .map(([key, value]) => ({
       key,
       label: REGION_LABELS[key] || key.replace(/_/g, " "),
@@ -130,8 +135,8 @@ function getUptime(report) {
   return firstNumeric(...candidates);
 }
 
-function buildStats(report) {
-  const responseTimes = extractResponseTimes(report);
+function buildStats(report, config = {}) {
+  const responseTimes = extractResponseTimes(report, config.regions);
   const uptime = getUptime(report);
 
   const averageResponse = responseTimes.length
@@ -145,8 +150,8 @@ function buildStats(report) {
   const regions = responseTimes.map((item) => item.label);
 
   return {
-    // This is HetrixTools' report uptime value, so the number matches the
-    // uptime shown by HetrixTools instead of being calculated independently.
+    // This is HetrixTools' report uptime value, so the displayed number is
+    // taken directly from HetrixTools instead of being calculated here.
     uptime_90d: uptime !== null ? formatUptime(uptime) : "Unavailable",
     response_time: formatResponseTime(averageResponse),
     monitoring_region: regions.length ? regions.join(" · ") : "Unavailable",
@@ -155,17 +160,21 @@ function buildStats(report) {
   };
 }
 
-async function loadStats() {
-  const report = await hetrixReport();
-  return buildStats(report);
+async function loadStats(monitorId) {
+  const config = MONITOR_CONFIG[monitorId];
+  if (!config) throw new Error(`Unsupported Hetrix monitor: ${monitorId}`);
+
+  const report = await hetrixReport(monitorId);
+  return buildStats(report, config);
 }
 
-async function getSportixStats() {
-  const cached = await redis(["GET", CACHE_KEY]);
+async function getMonitorStats(monitorId) {
+  const cacheKey = `hetrix:stats:v3:${monitorId}`;
+  const cached = await redis(["GET", cacheKey]);
   if (cached) return typeof cached === "string" ? JSON.parse(cached) : cached;
 
-  const stats = await loadStats();
-  await redis(["SET", CACHE_KEY, JSON.stringify(stats), "EX", CACHE_TTL_SECONDS]);
+  const stats = await loadStats(monitorId);
+  await redis(["SET", cacheKey, JSON.stringify(stats), "EX", CACHE_TTL_SECONDS]);
   return stats;
 }
 
@@ -175,10 +184,15 @@ async function handler(req, res) {
   }
 
   try {
-    const stats = await getSportixStats();
+    const monitorId = req.query?.monitor_id;
+    if (!monitorId || !MONITOR_CONFIG[monitorId]) {
+      return json(res, 400, { ok: false, error: "Unsupported or missing monitor_id" });
+    }
+
+    const stats = await getMonitorStats(monitorId);
     return json(res, 200, {
       ok: true,
-      monitor_id: MONITOR_ID,
+      monitor_id: monitorId,
       stats,
     });
   } catch (error) {
@@ -191,4 +205,6 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
-module.exports.getSportixStats = getSportixStats;
+module.exports.getMonitorStats = getMonitorStats;
+module.exports.getSportixStats = () =>
+  getMonitorStats("aa30f6893c27e5421ac3ef4471fca386");
