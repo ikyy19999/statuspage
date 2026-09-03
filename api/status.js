@@ -56,6 +56,12 @@ module.exports = async function handler(req, res) {
         const monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
         monitor.display_name = displayName(monitor);
 
+        // The frontend matches services using monitor_name. Expose the
+        // configured display name there too, without changing Redis data.
+        if (STATUS_PAGE_MONITOR_IDS.has(monitor.monitor_id)) {
+          monitor.monitor_name = monitor.display_name;
+        }
+
         if (STATUS_PAGE_MONITOR_IDS.has(monitor.monitor_id)) {
           try {
             monitor.stats = await getMonitorStats(monitor.monitor_id);
