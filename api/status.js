@@ -1,9 +1,10 @@
 const DISPLAY_NAMES = {
   aa30f6893c27e5421ac3ef4471fca386: "Sportix",
+  197f125b46a6449c2d034beb044a6e34: "Portfolio",
 };
 
-const SPORTIX_MONITOR_ID = "aa30f6893c27e5421ac3ef4471fca386";
-const { getSportixStats } = require("./hetrix/stats");
+const STATUS_PAGE_MONITOR_IDS = new Set(Object.keys(DISPLAY_NAMES));
+const { getMonitorStats } = require("./hetrix/stats");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -55,15 +56,11 @@ module.exports = async function handler(req, res) {
         const monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
         monitor.display_name = displayName(monitor);
 
-        if (monitor.monitor_id === SPORTIX_MONITOR_ID) {
-          const activeIncident = incidentRaw
-            ? typeof incidentRaw === "string" ? JSON.parse(incidentRaw) : incidentRaw
-            : null;
-
+        if (STATUS_PAGE_MONITOR_IDS.has(monitor.monitor_id)) {
           try {
-            monitor.stats = await getSportixStats(activeIncident);
+            monitor.stats = await getMonitorStats(monitor.monitor_id);
           } catch (statsError) {
-            console.error("sportix stats error", statsError);
+            console.error(`stats error for ${monitor.monitor_id}`, statsError);
             monitor.stats = null;
           }
         }
@@ -71,7 +68,7 @@ module.exports = async function handler(req, res) {
         monitors.push(monitor);
       }
 
-      if (incidentRaw) {
+      if (incidentRaw && STATUS_PAGE_MONITOR_IDS.has(monitorId)) {
         const incident = typeof incidentRaw === "string" ? JSON.parse(incidentRaw) : incidentRaw;
         incident.display_name =
           DISPLAY_NAMES[incident.monitor_id] || incident.display_name || incident.monitor_name;
