@@ -1746,6 +1746,7 @@
       services: [
         {
           name: "Portfolio",
+          monitorId: "197f125b46a6449c2d034beb044a6e34",
           group: "Portfolio website",
           status: "operational",
           uptime: "99.99%",
@@ -1754,6 +1755,7 @@
         },
         {
           name: "Sportix",
+          monitorId: "aa30f6893c27e5421ac3ef4471fca386",
           group: "Web application",
           status: "operational",
           uptime: "97.8246%",
@@ -1839,6 +1841,10 @@
     }
 
     function monitorMatchesService(service, monitor) {
+      if (service.monitorId && monitor.monitor_id) {
+        return service.monitorId === monitor.monitor_id;
+      }
+
       const serviceName = normalizeMonitorText(service.name);
       const monitorName = normalizeMonitorText(monitor.monitor_name);
       const target = normalizeMonitorText(monitor.monitor_target);
