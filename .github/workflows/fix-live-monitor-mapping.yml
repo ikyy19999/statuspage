@@ -1,0 +1,56 @@
+name: Fix live monitor mapping
+
+on:
+  push:
+    paths:
+      - .github/workflows/fix-live-monitor-mapping.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch index.html
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("index.html")
+          text = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  '''          name: "Portfolio",\n          group: "Portfolio website",\n          status: "operational",''',
+                  '''          name: "Portfolio",\n          monitorId: "197f125b46a6449c2d034beb044a6e34",\n          group: "Portfolio website",\n          status: "operational",''',
+              ),
+              (
+                  '''          name: "Sportix",\n          group: "Web application",\n          status: "operational",''',
+                  '''          name: "Sportix",\n          monitorId: "aa30f6893c27e5421ac3ef4471fca386",\n          group: "Web application",\n          status: "operational",''',
+              ),
+              (
+                  '''    function monitorMatchesService(service, monitor) {\n      const serviceName = normalizeMonitorText(service.name);''',
+                  '''    function monitorMatchesService(service, monitor) {\n      if (service.monitorId && monitor.monitor_id) {\n        return service.monitorId === monitor.monitor_id;\n      }\n\n      const serviceName = normalizeMonitorText(service.name);''',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Expected source pattern not found: {old!r}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "fix live monitor mapping by monitor id"
+          git push
