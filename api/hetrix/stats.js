@@ -1,11 +1,11 @@
 const MONITOR_CONFIG = {
-  aa30f6893c27e5421ac3ef4471fca386: {},
-  197f125b46a6449c2d034beb044a6e34: {
+  "aa30f6893c27e5421ac3ef4471fca386": {},
+  "197f125b46a6449c2d034beb044a6e34": {
     regions: ["New_York", "Singapore", "Tokyo", "Mumbai"],
   },
 };
 
-const CACHE_TTL_SECONDS = 300;
+const CACHE_TTL_SECONDS = 60;
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -135,6 +135,36 @@ function getUptime(report) {
   return firstNumeric(...candidates);
 }
 
+
+function normalizeMonitorStatus(value) {
+  const status = String(value || "").toLowerCase().trim();
+  if (["online", "up", "operational", "ok", "passing", "available"].includes(status)) return "operational";
+  if (["offline", "down", "major_outage", "failing", "failed", "unavailable"].includes(status)) return "major_outage";
+  if (["degraded", "warning", "partial_outage"].includes(status)) return status === "warning" ? "degraded" : status;
+  return null;
+}
+
+function getCurrentStatus(report) {
+  const candidates = [
+    report?.Global_Status,
+    report?.GlobalStatus,
+    report?.global_status,
+    report?.Status,
+    report?.status,
+    report?.Uptime_Stats?.Total?.Status,
+    report?.Uptime_Stats?.Total?.status,
+    report?.Uptime_Stats?.total?.Status,
+    report?.Uptime_Stats?.total?.status,
+  ];
+
+  for (const value of candidates) {
+    const normalized = normalizeMonitorStatus(value);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
 function buildStats(report, config = {}) {
   const responseTimes = extractResponseTimes(report, config.regions);
   const uptime = getUptime(report);
@@ -150,6 +180,7 @@ function buildStats(report, config = {}) {
   const regions = responseTimes.map((item) => item.label);
 
   return {
+    status: getCurrentStatus(report),
     // This is HetrixTools' report uptime value, so the displayed number is
     // taken directly from HetrixTools instead of being calculated here.
     uptime_90d: uptime !== null ? formatUptime(uptime) : "Unavailable",
