@@ -3,7 +3,7 @@ const DISPLAY_NAMES = {
   197f125b46a6449c2d034beb044a6e34: "Portfolio",
 };
 
-const STATUS_PAGE_MONITOR_IDS = new Set(Object.keys(DISPLAY_NAMES));
+const STATUS_PAGE_MONITOR_IDS = Object.keys(DISPLAY_NAMES);
 const { getMonitorStats } = require("./hetrix/stats");
 
 function json(res, status, body) {
@@ -38,46 +38,56 @@ function displayName(monitor) {
   return DISPLAY_NAMES[monitor.monitor_id] || monitor.monitor_name;
 }
 
+async function readMonitor(monitorId) {
+  const monitorRaw = await redis(["GET", `hetrix:monitor:${monitorId}`]);
+  if (!monitorRaw) return null;
+
+  const monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
+  const name = displayName({ ...monitor, monitor_id: monitorId });
+
+  monitor.monitor_id = monitorId;
+  monitor.display_name = name;
+  monitor.monitor_name = name;
+
+  try {
+    monitor.stats = await getMonitorStats(monitorId);
+  } catch (statsError) {
+    console.error(`stats error for ${monitorId}`, statsError);
+    monitor.stats = null;
+  }
+
+  return monitor;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
     return json(res, 405, { ok: false, error: "Method not allowed" });
   }
 
   try {
-    const ids = (await redis(["SMEMBERS", "hetrix:monitors"])) || [];
+    const redisMonitorIds = (await redis(["SMEMBERS", "hetrix:monitors"])) || [];
+
+    // Always read the monitors configured for this status page. Redis membership
+    // is only used to include any additional monitors that are not mapped here.
+    const monitorIds = [
+      ...STATUS_PAGE_MONITOR_IDS,
+      ...redisMonitorIds.filter((id) => !STATUS_PAGE_MONITOR_IDS.includes(id)),
+    ];
+
     const monitors = [];
     const active_incidents = [];
 
-    for (const monitorId of ids) {
-      const monitorRaw = await redis(["GET", `hetrix:monitor:${monitorId}`]);
+    for (const monitorId of monitorIds) {
+      const monitor = await readMonitor(monitorId);
       const incidentRaw = await redis(["GET", `hetrix:incident:${monitorId}`]);
 
-      if (monitorRaw) {
-        const monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
-        monitor.display_name = displayName(monitor);
+      if (monitor) monitors.push(monitor);
 
-        // The frontend matches services using monitor_name. Expose the
-        // configured display name there too, without changing Redis data.
-        if (STATUS_PAGE_MONITOR_IDS.has(monitor.monitor_id)) {
-          monitor.monitor_name = monitor.display_name;
-        }
-
-        if (STATUS_PAGE_MONITOR_IDS.has(monitor.monitor_id)) {
-          try {
-            monitor.stats = await getMonitorStats(monitor.monitor_id);
-          } catch (statsError) {
-            console.error(`stats error for ${monitor.monitor_id}`, statsError);
-            monitor.stats = null;
-          }
-        }
-
-        monitors.push(monitor);
-      }
-
-      if (incidentRaw && STATUS_PAGE_MONITOR_IDS.has(monitorId)) {
+      if (incidentRaw && STATUS_PAGE_MONITOR_IDS.includes(monitorId)) {
         const incident = typeof incidentRaw === "string" ? JSON.parse(incidentRaw) : incidentRaw;
+        incident.monitor_id = monitorId;
         incident.display_name =
-          DISPLAY_NAMES[incident.monitor_id] || incident.display_name || incident.monitor_name;
+          DISPLAY_NAMES[monitorId] || incident.display_name || incident.monitor_name;
         active_incidents.push(incident);
       }
     }
