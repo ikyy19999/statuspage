@@ -1,6 +1,6 @@
 const DISPLAY_NAMES = {
-  aa30f6893c27e5421ac3ef4471fca386: "Sportix",
-  197f125b46a6449c2d034beb044a6e34: "Portfolio",
+  "aa30f6893c27e5421ac3ef4471fca386": "Sportix",
+  "197f125b46a6449c2d034beb044a6e34": "Portfolio",
 };
 
 const STATUS_PAGE_MONITOR_IDS = Object.keys(DISPLAY_NAMES);
@@ -39,22 +39,32 @@ function displayName(monitor) {
 }
 
 async function readMonitor(monitorId) {
+  let monitor = null;
+
   const monitorRaw = await redis(["GET", `hetrix:monitor:${monitorId}`]);
-  if (!monitorRaw) return null;
+  if (monitorRaw) {
+    monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
+  }
 
-  const monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
+  try {
+    const stats = await getMonitorStats(monitorId);
+    monitor = monitor || {};
+    monitor.stats = stats;
+
+    if (stats.status) {
+      monitor.status = stats.status;
+      monitor.monitor_status = stats.status === "operational" ? "online" : "offline";
+    }
+  } catch (statsError) {
+    console.error(`stats error for ${monitorId}`, statsError);
+  }
+
+  if (!monitor) return null;
+
   const name = displayName({ ...monitor, monitor_id: monitorId });
-
   monitor.monitor_id = monitorId;
   monitor.display_name = name;
   monitor.monitor_name = name;
-
-  try {
-    monitor.stats = await getMonitorStats(monitorId);
-  } catch (statsError) {
-    console.error(`stats error for ${monitorId}`, statsError);
-    monitor.stats = null;
-  }
 
   return monitor;
 }
