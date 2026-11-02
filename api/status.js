@@ -6,6 +6,8 @@ const DISPLAY_NAMES = {
 const STATUS_PAGE_MONITOR_IDS = Object.keys(DISPLAY_NAMES);
 const { getMonitorStats } = require("./hetrix/stats");
 
+const SPORTIX_MONITOR_ID = "aa30f6893c27e5421ac3ef4471fca386";
+
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -46,6 +48,27 @@ async function readMonitor(monitorId) {
     monitor = typeof monitorRaw === "string" ? JSON.parse(monitorRaw) : monitorRaw;
   }
 
+  // --- LOGIKA KHUSUS MIGRASI SPORTIX ---
+  if (monitorId === SPORTIX_MONITOR_ID) {
+    monitor = monitor || {};
+    monitor.status = "maintenance"; 
+    monitor.monitor_status = "offline";
+    monitor.stats = { 
+      ...(monitor.stats || {}), 
+      status: "maintenance",
+      uptime_90d: "99.80%", 
+      response_time: "Migrasi server",
+      monitoring_region: "Global edge"
+    };
+    
+    const name = displayName({ ...monitor, monitor_id: monitorId });
+    monitor.monitor_id = monitorId;
+    monitor.display_name = name;
+    monitor.monitor_name = name;
+    return monitor;
+  }
+  // -------------------------------------
+
   try {
     const stats = await getMonitorStats(monitorId);
     monitor = monitor || {};
@@ -57,6 +80,10 @@ async function readMonitor(monitorId) {
     }
   } catch (statsError) {
     console.error(`stats error for ${monitorId}`, statsError);
+    if (!monitor) monitor = {};
+    if (monitor.status === "maintenance") {
+      monitor.monitor_status = "offline";
+    }
   }
 
   if (!monitor) return null;
@@ -77,8 +104,6 @@ module.exports = async function handler(req, res) {
   try {
     const redisMonitorIds = (await redis(["SMEMBERS", "hetrix:monitors"])) || [];
 
-    // Always read the monitors configured for this status page. Redis membership
-    // is only used to include any additional monitors that are not mapped here.
     const monitorIds = [
       ...STATUS_PAGE_MONITOR_IDS,
       ...redisMonitorIds.filter((id) => !STATUS_PAGE_MONITOR_IDS.includes(id)),

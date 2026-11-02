@@ -1728,10 +1728,6 @@
       Status refreshed.
     </div>
     <script>
-/* =====================================================
-       EDIT STATUS DATA HERE
-       Ubah data di bawah ini untuk update halaman status.
-       ===================================================== */
     const STATUS_CONFIG = {
       overallUptime: "99.98%",
 
@@ -1757,10 +1753,18 @@
           name: "Sportix",
           monitorId: "aa30f6893c27e5421ac3ef4471fca386",
           group: "Web application",
+          status: "maintenance",
+          uptime: "99.80%",
+          response: "Migrasi server",
+          region: "Global edge",
+        },
+        {
+          name: "Havunio",
+          group: "Web platform",
           status: "operational",
-          uptime: "97.8246%",
-          response: "Unavailable",
-          region: "Unavailable",
+          uptime: "100%",
+          response: "142 ms",
+          region: "Global edge",
         },
         {
           name: "Application API",
@@ -1845,6 +1849,10 @@
         return service.monitorId === monitor.monitor_id;
       }
 
+      if (!service.monitorId) {
+        return false;
+      }
+
       const serviceName = normalizeMonitorText(service.name);
       const monitorName = normalizeMonitorText(monitor.monitor_name);
       const target = normalizeMonitorText(monitor.monitor_target);
@@ -1866,6 +1874,10 @@
       let matched = 0;
 
       STATUS_CONFIG.services.forEach((service) => {
+        if (service.name === "Sportix" && service.status === "maintenance") {
+          return; 
+        }
+
         const monitor = data.monitors.find((item) =>
           monitorMatchesService(service, item),
         );
@@ -2051,6 +2063,7 @@
         STATUS_CONFIG.overallUptime;
 
       let worstStatus = "operational";
+      let maintenanceService = null;
 
       if (STATUS_CONFIG.services.some((service) => service.status === "major_outage")) {
         worstStatus = "major_outage";
@@ -2059,7 +2072,13 @@
       ) {
         worstStatus = "partial_outage";
       } else if (
-        STATUS_CONFIG.services.some((service) => service.status === "maintenance")
+        STATUS_CONFIG.services.some((service) => {
+          if (service.status === "maintenance") {
+            maintenanceService = service;
+            return true;
+          }
+          return false;
+        })
       ) {
         worstStatus = "maintenance";
       } else if (
@@ -2078,12 +2097,37 @@
 
       document.querySelector("#overall-title").textContent =
         overallTitles[worstStatus];
+
+      if (maintenanceService && !STATUS_CONFIG.activeIncident.enabled) {
+        STATUS_CONFIG.activeIncident = {
+          enabled: true,
+          title: `${maintenanceService.name} is under maintenance`,
+          status: "Maintenance",
+          message: `We are currently migrating ${maintenanceService.name} to a new server for better performance. Services will resume shortly.`,
+          startedAt: new Date().toLocaleString("en-GB", {
+            timeZone: "Asia/Jakarta",
+            dateStyle: "medium",
+            timeStyle: "short",
+          }) + " WIB",
+        };
+      } else if (!maintenanceService && !STATUS_CONFIG.activeIncident.enabled) {
+         STATUS_CONFIG.activeIncident = {
+          enabled: false,
+          title: "",
+          status: "",
+          message: "",
+          startedAt: "",
+        };
+      }
+
+      renderActiveIncident();
     }
 
     function renderActiveIncident() {
       const incident = STATUS_CONFIG.activeIncident;
       const banner = document.querySelector("#active-incident");
       const currentState = document.querySelector("#current-state");
+      const currentCopy = document.querySelector("#current-copy");
 
       if (!incident.enabled) {
         banner.classList.remove("show");
@@ -2091,8 +2135,8 @@
           <span class="dot"></span>
           <span>No active incidents</span>
         `;
-        currentState.style.color = "";
-        document.querySelector("#current-copy").textContent =
+        currentState.style.color = "var(--green)";
+        currentCopy.textContent =
           "All monitored services are responding normally.";
         return;
       }
@@ -2108,11 +2152,11 @@
           class="dot"
           style="background: var(--orange); box-shadow: 0 0 0 6px var(--orange-soft)"
         ></span>
-        <span>Active incident · ${incident.status}</span>
+        <span>Active maintenance · ${incident.status}</span>
       `;
 
       currentState.style.color = "var(--orange)";
-      document.querySelector("#current-copy").textContent = incident.message;
+      currentCopy.textContent = incident.message;
     }
 
     function renderIncidentHistory() {
